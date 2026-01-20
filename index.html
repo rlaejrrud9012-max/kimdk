@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeepStudy V6.1 (Free Voice)</title>
+    <title>DeepStudy V6.2 (Voice Hunter)</title>
     
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -33,14 +33,12 @@
         .app-height { height: 100vh; height: 100dvh; }
         .prevent-select { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
         
-        /* 빈칸 스타일 */
         .cloze-hidden { color: transparent; border-bottom: 2px solid #9CA3AF; user-select: none; display: inline-block; min-width: 20px; line-height: 1.2; transition: all 0.2s; }
         .dark .cloze-hidden { border-bottom-color: #6B7280; }
         .cloze-visible { color: #2563EB; font-weight: 800; }
         .dark .cloze-visible { color: #60A5FA; }
         .peeking .cloze-hidden { color: #9333EA !important; border-bottom-color: #9333EA !important; font-weight: bold; }
         
-        /* 노래방 하이라이트 효과 */
         .tts-active { background-color: rgba(37, 99, 235, 0.15); border-radius: 4px; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
         .dark .tts-active { background-color: rgba(96, 165, 250, 0.2); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15); }
 
@@ -174,16 +172,16 @@
                 <div class="flex justify-between mb-4"><h3 class="text-xl font-bold">설정 및 관리</h3><button @click="showSettings = false" class="text-gray-400">✕</button></div>
                 
                 <div class="mb-4 bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
-                    <h4 class="text-sm font-bold text-purple-800 dark:text-purple-400 mb-2 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.699-3.181a1 1 0 011.827 1.035l-1.74 3.258 2.135 2.135a1 1 0 01-1.414 1.414l-2.423-2.423-.87.87a6 6 0 11-8.485 0l-.87-.87-2.423 2.423a1 1 0 01-1.414-1.414l2.135-2.135-1.74-3.258a1 1 0 011.827-1.035l1.699 3.181L9 4.323V3a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-                        음성 설정 (TTS)
+                    <h4 class="text-sm font-bold text-purple-800 dark:text-purple-400 mb-2 flex items-center justify-between">
+                        <span class="flex items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.699-3.181a1 1 0 011.827 1.035l-1.74 3.258 2.135 2.135a1 1 0 01-1.414 1.414l-2.423-2.423-.87.87a6 6 0 11-8.485 0l-.87-.87-2.423 2.423a1 1 0 01-1.414-1.414l2.135-2.135-1.74-3.258a1 1 0 011.827-1.035l1.699 3.181L9 4.323V3a1 1 0 011-1z" clip-rule="evenodd" /></svg>음성 설정 (TTS)</span>
+                        <button @click="loadVoices" class="text-[10px] bg-purple-100 text-purple-600 px-2 py-1 rounded">🔄 목록 새로고침</button>
                     </h4>
                     <div class="mb-2">
-                        <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">목소리 선택</label>
+                        <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">목소리 선택 ({{ voiceList.length }}개 감지됨)</label>
                         <select v-model="selectedVoiceIndex" @change="saveSettings" class="w-full p-2 text-xs border border-purple-200 dark:border-purple-700 rounded bg-white dark:bg-gray-700">
-                            <option v-for="(v, idx) in voiceList" :key="idx" :value="idx">{{ v.name }}</option>
+                            <option v-for="(v, idx) in voiceList" :key="idx" :value="idx">{{ v.name }} ({{ v.lang }})</option>
                         </select>
-                        <p class="text-[9px] text-gray-400 mt-1">* 기기에 내장된 한국어 음성입니다.</p>
+                        <p class="text-[9px] text-gray-400 mt-1">* 안 보이면 Safari 완전 종료 후 다시 켜보세요.</p>
                     </div>
                 </div>
 
@@ -248,11 +246,18 @@
                 this.isDarkMode = (savedDark === 'true');
                 if(this.isDarkMode) document.documentElement.classList.add('dark');
 
-                // [NEW] 음성 목록 불러오기
+                // [NEW] 음성 목록 불러오기 (iOS 타이밍 이슈 해결을 위한 polling)
                 this.loadVoices();
-                if (window.speechSynthesis.onvoiceschanged !== undefined) {
-                    window.speechSynthesis.onvoiceschanged = this.loadVoices;
-                }
+                if (window.speechSynthesis.onvoiceschanged !== undefined) window.speechSynthesis.onvoiceschanged = this.loadVoices;
+                
+                // iOS safari 음성 로드 지연 대비 5회 재시도
+                let attempts = 0;
+                const interval = setInterval(() => {
+                    this.loadVoices();
+                    attempts++;
+                    if (this.voiceList.length > 1 || attempts > 5) clearInterval(interval);
+                }, 1000);
+
                 const savedVoiceIdx = localStorage.getItem('deepstudy_voice_idx');
                 if(savedVoiceIdx) this.selectedVoiceIndex = parseInt(savedVoiceIdx);
 
@@ -313,7 +318,7 @@
                                     u.voice = this.voiceList[this.selectedVoiceIndex];
                                 }
                                 u.lang = 'ko-KR'; 
-                                u.rate = 0.8; // 속도 0.8 (자연스러움)
+                                u.rate = 0.9; // 속도 0.9 (자연스러움)
                                 u.pitch = 1.0;
                                 u.onend = () => { resolve(); };
                                 u.onerror = (e) => { console.error(e); resolve(); };
@@ -328,7 +333,7 @@
                 toggleDarkMode() { this.isDarkMode = !this.isDarkMode; },
                 resetFilters(resetAll = false) { if(resetAll) { this.filterL1=''; this.filterL2=''; this.filterL3=''; } else { if(this.filterL1){this.filterL2='';this.filterL3='';} } },
                 openModal(mode, card = null) { this.isEditMode = (mode === 'edit'); if (this.isEditMode && card) { this.editingId = card.id; this.inputL1 = card.l1; this.inputL2 = card.l2; this.inputL3 = card.l3; this.inputContent = card.content; } else { this.editingId = null; this.inputL1=this.filterL1; this.inputL2=this.filterL2; this.inputL3=this.filterL3; this.inputContent=''; } this.showModal = true; },
-                saveCard() { if(!this.inputL1 || !this.inputContent) return alert('입력 확인'); if (this.isEditMode && this.editingId) { const idx = this.cards.findIndex(c => c.id === this.editingId); if(idx !== -1) { this.cards[idx].l1 = this.inputL1.trim(); this.cards[idx].l2 = this.inputL2.trim()||'기타'; this.cards[idx].l3 = this.inputL3.trim()||'일반'; this.cards[idx].content = this.inputContent; } } else { this.cards.push({ id: Date.now(), l1: this.inputL1.trim(), l2: this.inputL2.trim()||'기타', l3: this.inputL3.trim()||'일반', content: this.inputContent, readCount: 1, isMemorized: false, isImportant: false }); this.filterL1 = ''; this.filterL2 = ''; this.filterL3 = ''; this.$nextTick(() => { if(this.swiper) { this.swiper.update(); this.swiper.slideTo(this.cards.length - 1, 500); } }); } this.saveData(); this.showModal=false; },
+                saveCard() { if(!this.inputL1 || !this.inputContent) return alert('입력 확인'); if (this.isEditMode && this.editingId) { const idx = this.cards.findIndex(c => c.id === this.editingId); if(idx !== -1) { this.cards[idx].l1 = this.inputL1.trim(); this.cards[idx].l2 = this.inputL2.trim()||'기타'; this.cards[idx].l3 = this.inputL3.trim()||'일반'; this.cards[idx].content = this.inputContent; } } else { this.cards.push({ id: Date.now(), l1: this.inputL1.trim(), l2: this.inputL2.trim()||'기타', l3: this.inputL3.trim()||'일반', content: this.inputContent, readCount: 1, isMemorized: false, isImportant: false }); this.filterL1 = ''; this.filterL2 = ''; this.filterL3 = ''; this.$nextTick(() => { if(this.swiper) { this.swiper.update(); this.swiper.slideTo(this.cards.length - 5, 500); } }); } this.saveData(); this.showModal=false; },
                 deleteCard(id) { if(confirm('삭제합니까?')){ this.cards=this.cards.filter(c=>c.id!==id); this.saveData(); } },
                 getDisplayContent(card) { if (!card.content) return ''; let text = card.content; text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); if (card.isMemorized) { text = text.replace(/\[(.*?)\]/g, '<span class="cloze-hidden">$1</span>'); } else { text = text.replace(/\[(.*?)\]/g, '<span class="cloze-visible">$1</span>'); } return text; },
                 handleDoubleTap(card) { this.pendingCard = card; this.modalMode = card.isMemorized ? 'unmemorize' : 'memorize'; this.showConfirmModal = true; },
@@ -354,4 +359,3 @@
     </style>
 </body>
 </html>
-
