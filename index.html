@@ -1,55 +1,89 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeepStudy V4.3 (Scroll Fix)</title>
+    <title>DeepStudy V5.0 (Masterpiece)</title>
+    
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { gray: { 900: '#111827', 800: '#1F2937', 700: '#374151' } } } }
+        }
+    </script>
+    
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #F3F4F6; overscroll-behavior-y: none; }
+        body { font-family: 'Pretendard', sans-serif; overscroll-behavior-y: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 안전 영역 및 전체 높이 설정 */
         .safe-top { padding-top: max(env(safe-area-inset-top), 20px); }
         .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 20px); }
         .app-height { height: 100vh; height: 100dvh; }
+        
         .prevent-select { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
-        .cloze-hidden { color: transparent; border-bottom: 2px solid #9CA3AF; user-select: none; display: inline-block; min-width: 20px; line-height: 1.2; }
+        
+        /* 빈칸 스타일 (다크모드 대응) */
+        .cloze-hidden { color: transparent; border-bottom: 2px solid #9CA3AF; user-select: none; display: inline-block; min-width: 20px; line-height: 1.2; transition: all 0.2s; }
+        .dark .cloze-hidden { border-bottom-color: #6B7280; }
+        
         .cloze-visible { color: #2563EB; font-weight: 800; }
+        .dark .cloze-visible { color: #60A5FA; }
+        
+        /* 정답 엿보기 모드 */
+        .peeking .cloze-hidden { color: #9333EA !important; border-bottom-color: #9333EA !important; font-weight: bold; }
+        .dark .peeking .cloze-hidden { color: #C084FC !important; border-bottom-color: #C084FC !important; }
+
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="app-height w-screen overflow-hidden flex flex-col text-gray-800 bg-gray-50">
+<body class="app-height w-screen overflow-hidden flex flex-col bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
 
     <div id="app" class="flex-1 flex flex-col relative max-w-lg mx-auto w-full h-full safe-top safe-bottom">
         
-        <header class="bg-white px-5 py-3 shadow-sm z-20 flex flex-col space-y-3 shrink-0 rounded-b-2xl">
+        <header class="bg-white dark:bg-gray-800 px-5 py-3 shadow-sm z-20 flex flex-col space-y-3 shrink-0 rounded-b-2xl transition-colors duration-300">
             <div class="flex justify-between items-center">
-                <h1 class="text-xl font-bold tracking-tight text-gray-900">DeepStudy</h1>
+                <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">DeepStudy</h1>
                 <div class="flex items-center space-x-1">
-                    <span class="text-xs text-gray-400 font-medium self-center mr-2">{{ filteredCards.length }}장의 카드</span>
-                    <button @click="openModal('add')" class="p-2 text-blue-600 hover:text-blue-800 transition-colors">
+                    <div class="flex flex-col items-end mr-3">
+                        <span class="text-[10px] font-bold text-blue-600 dark:text-blue-400">{{ progressPercent }}% 암기</span>
+                        <div class="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-0.5 overflow-hidden">
+                            <div class="h-full bg-blue-500 rounded-full transition-all duration-500" :style="{ width: progressPercent + '%' }"></div>
+                        </div>
+                    </div>
+
+                    <button @click="resetFilters(true)" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="필터 초기화">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+                    
+                    <button @click="openModal('add')" class="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
                     </button>
-                    <button @click="showSettings = true" class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <button @click="showSettings = true" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </button>
                 </div>
             </div>
             <div class="grid grid-cols-3 gap-2">
-                <select v-model="filterL1" @change="resetFilters('L1')" class="bg-gray-100 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">대분류 전체</option><option v-for="opt in optionsL1" :value="opt">{{ opt }}</option></select>
-                <select v-model="filterL2" @change="resetFilters('L2')" class="bg-gray-100 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">중분류 전체</option><option v-for="opt in optionsL2" :value="opt">{{ opt }}</option></select>
-                <select v-model="filterL3" class="bg-gray-100 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">소분류 전체</option><option v-for="opt in optionsL3" :value="opt">{{ opt }}</option></select>
+                <select v-model="filterL1" @change="resetFilters('L1')" class="bg-gray-100 dark:bg-gray-700 dark:text-gray-200 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">대분류 전체</option><option v-for="opt in optionsL1" :value="opt">{{ opt }}</option></select>
+                <select v-model="filterL2" @change="resetFilters('L2')" class="bg-gray-100 dark:bg-gray-700 dark:text-gray-200 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">중분류 전체</option><option v-for="opt in optionsL2" :value="opt">{{ opt }}</option></select>
+                <select v-model="filterL3" class="bg-gray-100 dark:bg-gray-700 dark:text-gray-200 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">소분류 전체</option><option v-for="opt in optionsL3" :value="opt">{{ opt }}</option></select>
             </div>
         </header>
 
         <main class="flex-1 relative w-full flex flex-col justify-center overflow-hidden">
-            <div v-if="filteredCards.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+            <div v-if="filteredCards.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 p-8 text-center">
                 <p class="text-sm">데이터가 없습니다.</p>
                 <button @click="openModal('add')" class="mt-4 text-blue-500 font-bold text-sm underline">새 카드 추가하기</button>
             </div>
@@ -57,23 +91,64 @@
             <div class="swiper mySwiper w-full h-full py-4" v-show="filteredCards.length > 0">
                 <div class="swiper-wrapper">
                     <div class="swiper-slide px-5 h-full flex items-center" v-for="card in filteredCards" :key="card.id">
-                        <div @click="handleCardClick(card)" class="w-full h-full max-h-[75vh] rounded-[2rem] p-7 shadow-xl flex flex-col relative border border-white/50 backdrop-blur-sm transition-colors duration-300 prevent-select" :class="card.isMemorized ? 'bg-[#F5F5F5]' : 'bg-[#E3F2FD]'">
+                        
+                        <div 
+                            @click="handleCardClick(card)"
+                            class="w-full h-full max-h-[75vh] rounded-[2rem] p-7 shadow-xl flex flex-col relative border backdrop-blur-sm transition-colors duration-300 prevent-select"
+                            :class="[
+                                isPeeking ? 'peeking' : '',
+                                card.isMemorized 
+                                    ? 'bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700' 
+                                    : (card.isImportant 
+                                        ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800' 
+                                        : 'bg-blue-50 border-blue-100 dark:bg-gray-800 dark:border-gray-700')
+                            ]"
+                        >
                             <div class="flex justify-between items-start mb-4 shrink-0">
-                                <div class="flex flex-col"><span class="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-0.5">{{ card.l1 }} > {{ card.l2 }}</span><span class="text-xs font-bold opacity-80 bg-white/40 px-2 py-0.5 rounded-md self-start">{{ card.l3 }}</span></div>
-                                <div class="flex items-center bg-white/60 px-2 py-1 rounded-lg shadow-sm"><span class="text-[10px] font-bold mr-1">회독</span><select v-model="card.readCount" @change="saveData" @click.stop class="bg-transparent text-sm font-extrabold focus:outline-none text-blue-900"><option v-for="n in 10" :value="n">{{ n }}</option></select></div>
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-0.5 dark:text-gray-400">{{ card.l1 }} > {{ card.l2 }}</span>
+                                    <span class="text-xs font-bold opacity-80 bg-white/40 dark:bg-black/20 px-2 py-0.5 rounded-md self-start dark:text-gray-300">{{ card.l3 }}</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button @click.stop="speak(card.content)" class="p-1.5 bg-white/60 dark:bg-black/20 rounded-full hover:bg-white dark:hover:bg-black/40 text-gray-500 dark:text-gray-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                                    </button>
+                                    <button @click.stop="toggleImportant(card)" class="p-1.5 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" :class="card.isImportant ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                             
                             <div class="flex-1 overflow-y-auto no-scrollbar swiper-no-swiping pr-1 my-2">
                                 <div class="min-h-full flex items-center">
-                                    <div class="text-[18px] font-medium leading-loose whitespace-pre-wrap text-left break-keep w-full" :class="card.isMemorized ? 'text-gray-500' : 'text-gray-800'" v-html="getDisplayContent(card)"></div>
+                                    <div 
+                                        class="font-medium leading-loose whitespace-pre-wrap text-left break-keep w-full transition-all"
+                                        :style="{ fontSize: fontSize + 'px' }"
+                                        :class="card.isMemorized ? 'text-gray-400 dark:text-gray-600' : 'text-gray-800 dark:text-gray-100'"
+                                        v-html="getDisplayContent(card)"
+                                    ></div>
                                 </div>
                             </div>
 
-                            <div class="mt-4 pt-4 border-t border-gray-400/10 flex justify-between items-center z-20 shrink-0">
-                                <div class="flex space-x-3"><button @click.stop="openModal('edit', card)" class="text-xs text-blue-400 hover:text-blue-600 p-2 font-bold">수정</button><button @click.stop="deleteCard(card.id)" class="text-xs text-red-300 hover:text-red-500 p-2">삭제</button></div>
-                                <div class="flex items-center p-2"><span class="text-xs font-bold transition-colors duration-300" :class="card.isMemorized ? 'text-gray-400' : 'text-blue-600'">{{ card.isMemorized ? '암기완료' : '암기중' }}</span></div>
+                            <div class="mt-4 pt-4 border-t border-black/5 dark:border-white/10 flex justify-between items-center z-20 shrink-0">
+                                <div class="flex space-x-3">
+                                    <button @click.stop="openModal('edit', card)" class="text-xs text-blue-400 hover:text-blue-600 font-bold">수정</button>
+                                    <button @click.stop="deleteCard(card.id)" class="text-xs text-red-300 hover:text-red-500">삭제</button>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <button 
+                                        @mousedown="isPeeking = true" @mouseup="isPeeking = false" @touchstart="isPeeking = true" @touchend="isPeeking = false"
+                                        class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 active:bg-purple-100 active:text-purple-600 transition-colors"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    </button>
+                                    
+                                    <span class="text-xs font-bold transition-colors duration-300" :class="card.isMemorized ? 'text-gray-400' : 'text-blue-600'">{{ card.isMemorized ? '암기완료' : '암기중' }}</span>
+                                </div>
                             </div>
-                            <div class="absolute bottom-2 left-0 w-full text-center pointer-events-none opacity-20"><span class="text-[10px]">{{ card.isMemorized ? '두 번 탭하여 암기 취소' : '두 번 탭하여 암기 완료' }}</span></div>
+                            <div class="absolute bottom-2 left-0 w-full text-center pointer-events-none opacity-20 dark:opacity-40"><span class="text-[10px] text-gray-500 dark:text-gray-400">{{ card.isMemorized ? '두 번 탭하여 암기 취소' : '두 번 탭하여 암기 완료' }}</span></div>
                         </div>
                     </div>
                 </div>
@@ -81,49 +156,58 @@
         </main>
 
         <div v-if="showModal" class="absolute inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center" @click.self="showModal = false">
-            <div class="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[85vh] flex flex-col animate-slide-up pb-10 sm:pb-6">
+            <div class="bg-white dark:bg-gray-800 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[85vh] flex flex-col animate-slide-up pb-10 sm:pb-6 text-gray-800 dark:text-gray-100">
                 <div class="flex justify-between mb-6"><h3 class="text-xl font-bold">{{ isEditMode ? '카드 수정' : '카드 추가' }}</h3><button @click="showModal = false" class="text-gray-400">✕</button></div>
                 <div class="flex-1 overflow-y-auto space-y-4 px-1">
-                    <div><label class="text-xs font-bold text-gray-500">대분류</label><input v-model="inputL1" list="dl_l1" class="w-full p-3 bg-gray-50 rounded-xl text-sm"><datalist id="dl_l1"><option v-for="o in allL1" :value="o"></datalist></div>
-                    <div class="flex gap-2"><div class="flex-1"><label class="text-xs font-bold text-gray-500">중분류</label><input v-model="inputL2" list="dl_l2" class="w-full p-3 bg-gray-50 rounded-xl text-sm"><datalist id="dl_l2"><option v-for="o in filteredL2Options" :value="o"></datalist></div><div class="flex-1"><label class="text-xs font-bold text-gray-500">소분류</label><input v-model="inputL3" list="dl_l3" class="w-full p-3 bg-gray-50 rounded-xl text-sm"><datalist id="dl_l3"><option v-for="o in filteredL3Options" :value="o"></datalist></div></div>
-                    <div><label class="text-xs font-bold text-gray-500 flex justify-between">내용 <span>숨길 단어는 [ ]로 감싸세요</span></label><textarea v-model="inputContent" class="w-full h-40 p-4 bg-gray-50 rounded-xl text-base resize-none" placeholder="예: [광명]은 살기 좋다."></textarea></div>
+                    <div><label class="text-xs font-bold text-gray-500 dark:text-gray-400">대분류</label><input v-model="inputL1" list="dl_l1" class="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-sm border-none"><datalist id="dl_l1"><option v-for="o in allL1" :value="o"></datalist></div>
+                    <div class="flex gap-2"><div class="flex-1"><label class="text-xs font-bold text-gray-500 dark:text-gray-400">중분류</label><input v-model="inputL2" list="dl_l2" class="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-sm border-none"><datalist id="dl_l2"><option v-for="o in filteredL2Options" :value="o"></datalist></div><div class="flex-1"><label class="text-xs font-bold text-gray-500 dark:text-gray-400">소분류</label><input v-model="inputL3" list="dl_l3" class="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-sm border-none"><datalist id="dl_l3"><option v-for="o in filteredL3Options" :value="o"></datalist></div></div>
+                    <div><label class="text-xs font-bold text-gray-500 dark:text-gray-400 flex justify-between">내용 <span>숨길 단어는 [ ]로 감싸세요</span></label><textarea v-model="inputContent" class="w-full h-40 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-base resize-none border-none" placeholder="예: [광명]은 살기 좋다."></textarea></div>
                 </div>
-                <button @click="saveCard" class="bg-blue-600 text-white py-4 rounded-xl font-bold text-lg mt-4 shadow-lg">{{ isEditMode ? '수정 완료' : '저장하기' }}</button>
+                <button @click="saveCard" class="bg-blue-600 text-white py-4 rounded-xl font-bold text-lg mt-4 shadow-lg hover:bg-blue-700">{{ isEditMode ? '수정 완료' : '저장하기' }}</button>
             </div>
         </div>
 
         <div v-if="showConfirmModal" class="absolute inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" @click.self="showConfirmModal = false">
-            <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl animate-fade-in text-center">
+            <div class="bg-white dark:bg-gray-800 w-full max-w-xs rounded-2xl p-6 shadow-2xl animate-fade-in text-center text-gray-800 dark:text-gray-100">
                 <h3 class="text-lg font-bold mb-2">{{ modalMode === 'memorize' ? '암기 완료?' : '다시 학습?' }}</h3>
-                <p class="text-sm text-gray-500 mb-6">{{ modalMode === 'memorize' ? '이 카드를 암기 완료 처리합니까?' : '암기 완료를 해제하시겠습니까?' }}</p>
-                <div class="flex space-x-3"><button @click="showConfirmModal = false" class="flex-1 py-3 bg-gray-100 rounded-xl text-gray-600 font-bold">아니오</button><button @click="confirmToggle" class="flex-1 py-3 rounded-xl font-bold text-white" :class="modalMode === 'memorize' ? 'bg-blue-600' : 'bg-gray-600'">네</button></div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ modalMode === 'memorize' ? '이 카드를 암기 완료 처리합니까?' : '암기 완료를 해제하시겠습니까?' }}</p>
+                <div class="flex space-x-3"><button @click="showConfirmModal = false" class="flex-1 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-gray-600 dark:text-gray-300 font-bold">아니오</button><button @click="confirmToggle" class="flex-1 py-3 rounded-xl font-bold text-white" :class="modalMode === 'memorize' ? 'bg-blue-600' : 'bg-gray-600'">네</button></div>
             </div>
         </div>
 
         <div v-if="showSettings" class="absolute inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center" @click.self="showSettings = false">
-            <div class="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[80dvh] flex flex-col animate-slide-up pb-10 sm:pb-6">
+            <div class="bg-white dark:bg-gray-800 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[80dvh] flex flex-col animate-slide-up pb-10 sm:pb-6 text-gray-800 dark:text-gray-100">
                 <div class="flex justify-between mb-4"><h3 class="text-xl font-bold">설정 및 관리</h3><button @click="showSettings = false" class="text-gray-400">✕</button></div>
                 
-                <div class="mb-6 bg-green-50 p-4 rounded-xl border border-green-100">
-                    <h4 class="text-sm font-bold text-green-800 mb-2 flex items-center"><svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.486 22 2 17.514 2 12S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10zm-1-16h2v6h-2zm0 8h2v2h-2z"/></svg>구글 스프레드시트 연동</h4>
-                    <input v-model="googleSheetUrl" class="w-full p-2 text-xs border border-green-200 rounded mb-2 bg-white" placeholder="웹에 게시된 CSV 링크">
+                <div class="mb-4 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">화면 설정</h4>
+                    
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xs font-medium">🌙 다크 모드</span>
+                        <button @click="toggleDarkMode" class="w-12 h-6 rounded-full p-1 transition-colors duration-300 relative" :class="isDarkMode ? 'bg-blue-600' : 'bg-gray-300'">
+                            <div class="w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300" :class="isDarkMode ? 'translate-x-6' : ''"></div>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col">
+                        <div class="flex justify-between mb-1"><span class="text-xs font-medium">글자 크기</span><span class="text-xs text-blue-500 font-bold">{{ fontSize }}px</span></div>
+                        <input type="range" v-model.number="fontSize" min="14" max="30" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" @change="saveSettings">
+                    </div>
+                </div>
+
+                <div class="mb-4 bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800">
+                    <h4 class="text-sm font-bold text-green-800 dark:text-green-400 mb-2 flex items-center">구글 시트 연동</h4>
+                    <input v-model="googleSheetUrl" class="w-full p-2 text-xs border border-green-200 dark:border-green-700 rounded mb-2 bg-white dark:bg-gray-700" placeholder="웹에 게시된 CSV 링크">
                     <button @click="syncGoogleSheet" class="w-full bg-green-600 text-white text-xs font-bold py-3 rounded-lg shadow-sm hover:bg-green-700 flex justify-center items-center"><span v-if="isSyncing" class="loader mr-2"></span>{{ isSyncing ? '동기화 중...' : '🔄 구글 시트 데이터 가져오기' }}</button>
-                    <p class="text-[10px] text-green-700 mt-2">* '웹에 게시 > CSV' 링크 필요</p>
                 </div>
 
-                <div class="mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                    <h4 class="text-sm font-bold text-blue-800 mb-3">데이터 백업/복원</h4>
-                    <div class="flex space-x-2"><button @click="exportData" class="flex-1 bg-white border border-blue-200 text-blue-600 text-xs font-bold py-3 rounded-lg shadow-sm hover:bg-blue-50">💾 파일 저장</button><label class="flex-1 bg-blue-600 text-white text-xs font-bold py-3 rounded-lg shadow-sm text-center cursor-pointer hover:bg-blue-700 flex items-center justify-center">📂 파일 열기<input type="file" accept=".json" @change="importData" class="hidden"></label></div>
+                <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+                    <h4 class="text-sm font-bold text-blue-800 dark:text-blue-400 mb-3">백업 및 복원</h4>
+                    <div class="flex space-x-2"><button @click="exportData" class="flex-1 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 text-xs font-bold py-3 rounded-lg shadow-sm">💾 저장</button><label class="flex-1 bg-blue-600 text-white text-xs font-bold py-3 rounded-lg shadow-sm text-center cursor-pointer flex items-center justify-center">📂 열기<input type="file" accept=".json" @change="importData" class="hidden"></label></div>
                 </div>
 
-                <div class="flex-1 overflow-y-auto">
-                    <h4 class="text-sm font-bold text-gray-800 mb-2">카테고리 관리</h4>
-                    <div class="flex space-x-2 mb-4 border-b border-gray-100 pb-2"><button @click="manageTab='L1'" :class="manageTab==='L1'?'text-blue-600 font-bold':'text-gray-400'" class="flex-1 py-2">대분류</button><button @click="manageTab='L2'" :class="manageTab==='L2'?'text-blue-600 font-bold':'text-gray-400'" class="flex-1 py-2">중분류</button><button @click="manageTab='L3'" :class="manageTab==='L3'?'text-blue-600 font-bold':'text-gray-400'" class="flex-1 py-2">소분류</button></div>
-                    <div v-for="item in manageList" :key="item" class="flex justify-between items-center p-3 border-b border-gray-50"><span class="font-medium text-sm">{{ item }}</span><div class="flex space-x-2"><button @click="renameCategory(item)" class="text-xs bg-gray-100 text-blue-600 px-2 py-1 rounded">수정</button><button @click="deleteCategory(item)" class="text-xs bg-red-50 text-red-500 px-2 py-1 rounded">삭제</button></div></div>
-                </div>
-
-                <div class="mt-4 pt-4 border-t border-gray-100">
-                    <button @click="resetData" class="w-full bg-red-50 text-red-500 border border-red-200 text-xs font-bold py-3 rounded-lg shadow-sm hover:bg-red-100 flex justify-center items-center">⚠️ 데이터 전체 초기화</button>
+                <div class="mt-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <button @click="resetData" class="w-full bg-red-50 dark:bg-red-900/20 text-red-500 border border-red-200 dark:border-red-800 text-xs font-bold py-3 rounded-lg shadow-sm">⚠️ 데이터 전체 초기화</button>
                 </div>
             </div>
         </div>
@@ -139,7 +223,9 @@
                     isEditMode: false, editingId: null, pendingCard: null, modalMode: 'memorize',
                     inputL1: '', inputL2: '', inputL3: '', inputContent: '',
                     manageTab: 'L1', swiper: null, lastTapTime: 0,
-                    googleSheetUrl: '', isSyncing: false
+                    googleSheetUrl: '', isSyncing: false,
+                    // [NEW] 신규 상태 변수들
+                    fontSize: 18, isDarkMode: false, isPeeking: false
                 }
             },
             computed: {
@@ -150,15 +236,38 @@
                 optionsL3() { let t = this.cards; if(this.filterL1) t = t.filter(c => c.l1===this.filterL1); if(this.filterL2) t = t.filter(c => c.l2===this.filterL2); return [...new Set(t.map(c => c.l3))].filter(Boolean).sort(); },
                 filteredL2Options() { return this.inputL1 ? [...new Set(this.cards.filter(c => c.l1===this.inputL1).map(c => c.l2))] : []; },
                 filteredL3Options() { return (this.inputL1 && this.inputL2) ? [...new Set(this.cards.filter(c => c.l1===this.inputL1 && c.l2===this.inputL2).map(c => c.l3))] : []; },
-                manageList() { if (this.manageTab === 'L1') return this.allL1; if (this.manageTab === 'L2') return [...new Set(this.cards.map(c => c.l2))].filter(Boolean).sort(); return [...new Set(this.cards.map(c => c.l3))].filter(Boolean).sort(); }
+                manageList() { if (this.manageTab === 'L1') return this.allL1; if (this.manageTab === 'L2') return [...new Set(this.cards.map(c => c.l2))].filter(Boolean).sort(); return [...new Set(this.cards.map(c => c.l3))].filter(Boolean).sort(); },
+                // [NEW] 진행률 계산
+                progressPercent() {
+                    if (this.cards.length === 0) return 0;
+                    const memorized = this.cards.filter(c => c.isMemorized).length;
+                    return Math.round((memorized / this.cards.length) * 100);
+                }
             },
-            watch: { 'filteredCards.length': function() { this.$nextTick(() => this.initSwiper()); } },
+            watch: { 
+                'filteredCards.length': function() { this.$nextTick(() => this.initSwiper()); },
+                isDarkMode(val) { 
+                    if(val) document.documentElement.classList.add('dark'); 
+                    else document.documentElement.classList.remove('dark');
+                    localStorage.setItem('deepstudy_dark', val);
+                }
+            },
             mounted() {
                 const saved = localStorage.getItem('deepstudy_cards');
                 if (saved) this.cards = JSON.parse(saved);
-                else this.cards = [{ id: 1, l1: '안내', l2: '기초', l3: '사용법', content: '[두 번 탭]하면 암기 상태가 변경됩니다.\n[대괄호]로 감싼 단어는 암기 완료 시 사라집니다.', readCount: 1, isMemorized: false }];
+                else this.cards = [{ id: 1, l1: '안내', l2: '기초', l3: '사용법', content: '[두 번 탭]하면 암기 상태가 변경됩니다.\n[별표]를 누르면 중요 카드로 설정됩니다.\n[스피커]를 누르면 읽어줍니다.', readCount: 1, isMemorized: false, isImportant: false }];
+                
                 const savedUrl = localStorage.getItem('deepstudy_sheet_url');
                 if (savedUrl) this.googleSheetUrl = savedUrl;
+
+                // [NEW] 설정 불러오기
+                const savedSize = localStorage.getItem('deepstudy_fontsize');
+                if (savedSize) this.fontSize = parseInt(savedSize);
+                
+                const savedDark = localStorage.getItem('deepstudy_dark');
+                this.isDarkMode = (savedDark === 'true');
+                if(this.isDarkMode) document.documentElement.classList.add('dark');
+
                 this.$nextTick(() => this.initSwiper());
             },
             methods: {
@@ -177,7 +286,26 @@
                     if (tapLength < 300 && tapLength > 0) { this.handleDoubleTap(card); }
                     this.lastTapTime = currentTime;
                 },
-                resetFilters(lv) { if(lv==='L1'){this.filterL2='';this.filterL3='';} if(lv==='L2') this.filterL3=''; },
+                // [NEW] 중요 표시 토글
+                toggleImportant(card) {
+                    card.isImportant = !card.isImportant;
+                    this.saveData();
+                },
+                // [NEW] TTS 읽기
+                speak(text) {
+                    if (!window.speechSynthesis) return alert('이 브라우저는 음성 지원을 하지 않습니다.');
+                    window.speechSynthesis.cancel();
+                    const cleanText = text.replace(/\[|\]/g, ''); // 괄호 제거하고 읽기
+                    const utterance = new SpeechSynthesisUtterance(cleanText);
+                    utterance.lang = 'ko-KR';
+                    utterance.rate = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                },
+                // [NEW] 필터 리셋
+                resetFilters(resetAll = false) { 
+                    if(resetAll) { this.filterL1=''; this.filterL2=''; this.filterL3=''; }
+                    else { if(this.filterL1){this.filterL2='';this.filterL3='';} }
+                },
                 openModal(mode, card = null) {
                     this.isEditMode = (mode === 'edit');
                     if (this.isEditMode && card) { this.editingId = card.id; this.inputL1 = card.l1; this.inputL2 = card.l2; this.inputL3 = card.l3; this.inputContent = card.content; } 
@@ -188,9 +316,12 @@
                     if(!this.inputL1 || !this.inputContent) return alert('입력 확인');
                     if (this.isEditMode && this.editingId) {
                         const idx = this.cards.findIndex(c => c.id === this.editingId);
-                        if(idx !== -1) { this.cards[idx].l1 = this.inputL1.trim(); this.cards[idx].l2 = this.inputL2.trim()||'기타'; this.cards[idx].l3 = this.inputL3.trim()||'일반'; this.cards[idx].content = this.inputContent; }
+                        if(idx !== -1) { 
+                            this.cards[idx].l1 = this.inputL1.trim(); this.cards[idx].l2 = this.inputL2.trim()||'기타'; this.cards[idx].l3 = this.inputL3.trim()||'일반'; this.cards[idx].content = this.inputContent; 
+                            // 기존 속성 유지
+                        }
                     } else {
-                        this.cards.push({ id: Date.now(), l1: this.inputL1.trim(), l2: this.inputL2.trim()||'기타', l3: this.inputL3.trim()||'일반', content: this.inputContent, readCount: 1, isMemorized: false });
+                        this.cards.push({ id: Date.now(), l1: this.inputL1.trim(), l2: this.inputL2.trim()||'기타', l3: this.inputL3.trim()||'일반', content: this.inputContent, readCount: 1, isMemorized: false, isImportant: false });
                         this.filterL1 = ''; this.filterL2 = ''; this.filterL3 = ''; 
                         this.$nextTick(() => { if(this.swiper) { this.swiper.update(); this.swiper.slideTo(this.cards.length - 1, 500); } });
                     }
@@ -206,12 +337,24 @@
                     return text;
                 },
                 handleDoubleTap(card) { this.pendingCard = card; this.modalMode = card.isMemorized ? 'unmemorize' : 'memorize'; this.showConfirmModal = true; },
-                confirmToggle() { if(this.pendingCard) { this.pendingCard.isMemorized = !this.pendingCard.isMemorized; this.saveData(); this.pendingCard = null; } this.showConfirmModal = false; },
+                confirmToggle() { 
+                    if(this.pendingCard) { 
+                        this.pendingCard.isMemorized = !this.pendingCard.isMemorized; 
+                        // [NEW] 암기 완료 시 폭죽 효과
+                        if(this.pendingCard.isMemorized) {
+                            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                        }
+                        this.saveData(); this.pendingCard = null; 
+                    } 
+                    this.showConfirmModal = false; 
+                },
                 renameCategory(oldName) { const newName = prompt(`'${oldName}' 변경:`, oldName); if (!newName || newName === oldName) return; const lv = this.manageTab.toLowerCase(); this.cards.forEach(c => { if (c[lv] === oldName) c[lv] = newName; }); this.saveData(); if(this.filterL1===oldName) this.filterL1=newName; },
                 deleteCategory(target) { const lv = this.manageTab.toLowerCase(); const cnt = this.cards.filter(c => c[lv] === target).length; if (confirm(`'${target}' 삭제? (${cnt}장)`)) { this.cards = this.cards.filter(c => c[lv] !== target); this.saveData(); this.filterL1=''; } },
                 exportData() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.cards)); const node = document.createElement('a'); node.href = dataStr; node.download = "deepstudy_backup.json"; document.body.appendChild(node); node.click(); node.remove(); },
                 importData(e) { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); if(confirm('데이터 덮어쓰기?')) { this.cards = d; this.saveData(); alert('완료'); this.showSettings=false; this.$nextTick(()=>this.initSwiper()); } } catch(err) { alert('파일 오류'); } }; r.readAsText(file); },
                 saveData() { localStorage.setItem('deepstudy_cards', JSON.stringify(this.cards)); },
+                // [NEW] 설정 저장
+                saveSettings() { localStorage.setItem('deepstudy_fontsize', this.fontSize); },
                 resetData() {
                     const pw = prompt("모든 카드가 영구 삭제됩니다.\n초기화하려면 비밀번호 '1227'을 입력하세요.");
                     if (pw === '1227') {
@@ -253,13 +396,18 @@
                     const data = []; const startIndex = (rows[0][0] === 'l1' || rows[0][0] === 'L1') ? 1 : 0;
                     for (let i = startIndex; i < rows.length; i++) {
                         const r = rows[i]; if (r.length < 4) continue;
-                        data.push({ id: Date.now() + i, l1: r[0] || '미분류', l2: r[1] || '기본', l3: r[2] || '일반', content: r[3] || '', readCount: 0, isMemorized: false });
+                        data.push({ id: Date.now() + i, l1: r[0] || '미분류', l2: r[1] || '기본', l3: r[2] || '일반', content: r[3] || '', readCount: 0, isMemorized: false, isImportant: false });
                     }
                     return data;
                 }
             }
         }).mount('#app');
     </script>
-    <style> @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.3s ease-out forwards; } .animate-fade-in { animation: fade-in 0.2s ease-out forwards; } @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } } </style>
+    <style> 
+        @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } 
+        .animate-slide-up { animation: slide-up 0.3s ease-out forwards; } 
+        .animate-fade-in { animation: fade-in 0.2s ease-out forwards; } 
+        @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } } 
+    </style>
 </body>
 </html>
