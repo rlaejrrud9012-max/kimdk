@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeepStudy V5.3 Final</title>
+    <title>DeepStudy V6.1 (Free Voice)</title>
     
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -23,7 +22,6 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
@@ -85,7 +83,6 @@
             <div class="swiper mySwiper w-full h-full py-4" v-show="filteredCards.length > 0">
                 <div class="swiper-wrapper">
                     <div class="swiper-slide px-5 h-full flex items-center" v-for="card in filteredCards" :key="card.id">
-                        
                         <div 
                             @click="handleCardClick(card)"
                             class="w-full h-full max-h-[75vh] rounded-[2rem] p-7 shadow-xl flex flex-col relative border backdrop-blur-sm transition-colors duration-300 prevent-select"
@@ -175,6 +172,21 @@
         <div v-if="showSettings" class="absolute inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center" @click.self="showSettings = false">
             <div class="bg-white dark:bg-gray-800 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[80dvh] flex flex-col animate-slide-up pb-10 sm:pb-6 text-gray-800 dark:text-gray-100">
                 <div class="flex justify-between mb-4"><h3 class="text-xl font-bold">설정 및 관리</h3><button @click="showSettings = false" class="text-gray-400">✕</button></div>
+                
+                <div class="mb-4 bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
+                    <h4 class="text-sm font-bold text-purple-800 dark:text-purple-400 mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.699-3.181a1 1 0 011.827 1.035l-1.74 3.258 2.135 2.135a1 1 0 01-1.414 1.414l-2.423-2.423-.87.87a6 6 0 11-8.485 0l-.87-.87-2.423 2.423a1 1 0 01-1.414-1.414l2.135-2.135-1.74-3.258a1 1 0 011.827-1.035l1.699 3.181L9 4.323V3a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                        음성 설정 (TTS)
+                    </h4>
+                    <div class="mb-2">
+                        <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">목소리 선택</label>
+                        <select v-model="selectedVoiceIndex" @change="saveSettings" class="w-full p-2 text-xs border border-purple-200 dark:border-purple-700 rounded bg-white dark:bg-gray-700">
+                            <option v-for="(v, idx) in voiceList" :key="idx" :value="idx">{{ v.name }}</option>
+                        </select>
+                        <p class="text-[9px] text-gray-400 mt-1">* 기기에 내장된 한국어 음성입니다.</p>
+                    </div>
+                </div>
+
                 <div class="mb-4 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                     <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">화면 설정</h4>
                     <div class="flex justify-between items-center mb-4"><span class="text-xs font-medium">🌙 다크 모드</span><button @click="toggleDarkMode" class="w-12 h-6 rounded-full p-1 transition-colors duration-300 relative" :class="isDarkMode ? 'bg-blue-600' : 'bg-gray-300'"><div class="w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300" :class="isDarkMode ? 'translate-x-6' : ''"></div></button></div>
@@ -200,7 +212,9 @@
                     googleSheetUrl: '', isSyncing: false,
                     fontSize: 18, isDarkMode: false, isPeeking: false,
                     isSpeaking: false, currentSpeakingCardId: null, currentSentenceIndex: -1,
-                    currentUtterance: null // [중요] 가비지 컬렉션 방지용 변수
+                    currentUtterance: null,
+                    // [NEW] 무료 음성 선택 관련 상태
+                    voiceList: [], selectedVoiceIndex: 0
                 }
             },
             computed: {
@@ -223,9 +237,7 @@
                 }
             },
             mounted() {
-                // 시작 시 기존 음성 취소
                 if(window.speechSynthesis) window.speechSynthesis.cancel();
-
                 const saved = localStorage.getItem('deepstudy_cards');
                 if (saved) this.cards = JSON.parse(saved);
                 else this.cards = [{ id: 1, l1: '안내', l2: '기초', l3: '사용법', content: '[두 번 탭]하면 암기 상태가 변경됩니다.\n[별표]를 누르면 중요 카드로 설정됩니다.\n[스피커]를 누르면 읽어줍니다.', readCount: 1, isMemorized: false, isImportant: false }];
@@ -236,9 +248,23 @@
                 this.isDarkMode = (savedDark === 'true');
                 if(this.isDarkMode) document.documentElement.classList.add('dark');
 
+                // [NEW] 음성 목록 불러오기
+                this.loadVoices();
+                if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                    window.speechSynthesis.onvoiceschanged = this.loadVoices;
+                }
+                const savedVoiceIdx = localStorage.getItem('deepstudy_voice_idx');
+                if(savedVoiceIdx) this.selectedVoiceIndex = parseInt(savedVoiceIdx);
+
                 this.$nextTick(() => this.initSwiper());
             },
             methods: {
+                // [NEW] 기기 내 한국어 음성 불러오기
+                loadVoices() {
+                    const all = window.speechSynthesis.getVoices();
+                    this.voiceList = all.filter(v => v.lang.includes('ko') || v.lang.includes('KR'));
+                    if(this.voiceList.length === 0) this.voiceList = [{name: '기본 음성', lang: 'ko-KR'}];
+                },
                 initSwiper() {
                     if (this.swiper) { this.swiper.destroy(); this.swiper = null; }
                     if (this.filteredCards.length > 0) {
@@ -269,39 +295,33 @@
                     return text.match(/[^.?!]+[.?!]+[\s\n]*|[^.?!]+$/g) || [text];
                 },
                 async playSpeech(card) {
-                    if (!window.speechSynthesis) return alert('음성 지원 미지원 브라우저');
-                    
+                    if (!window.speechSynthesis) return alert('브라우저 미지원');
                     this.isSpeaking = true;
                     this.currentSpeakingCardId = card.id;
-                    
                     const cleanText = (card.content || '').replace(/\[|\]/g, ''); 
                     const sentences = this.splitSentences(cleanText);
-
                     try {
                         for (let i = 0; i < sentences.length; i++) {
                             if (!this.isSpeaking || this.currentSpeakingCardId !== card.id) break;
-
                             this.currentSentenceIndex = i;
-                            
                             await new Promise(resolve => {
-                                // [중요] 변수에 할당하여 GC 방지
                                 const u = new SpeechSynthesisUtterance(sentences[i]);
                                 this.currentUtterance = u; 
                                 
-                                u.lang = 'ko-KR';
-                                u.rate = 0.9;
+                                // [NEW] 선택된 목소리 적용
+                                if (this.voiceList[this.selectedVoiceIndex]) {
+                                    u.voice = this.voiceList[this.selectedVoiceIndex];
+                                }
+                                u.lang = 'ko-KR'; 
+                                u.rate = 0.9; // 속도 0.9 (자연스러움)
                                 u.pitch = 1.0;
                                 u.onend = () => { resolve(); };
                                 u.onerror = (e) => { console.error(e); resolve(); };
-                                
                                 window.speechSynthesis.speak(u);
                             });
                         }
-                    } catch (e) {
-                        console.error("TTS Error", e);
-                    } finally {
-                        if(this.isSpeaking) this.stopSpeech();
-                    }
+                    } catch (e) { console.error("TTS Error", e); } 
+                    finally { if(this.isSpeaking) this.stopSpeech(); }
                 },
                 handleCardClick(card) { const t = new Date().getTime(); if (t - this.lastTapTime < 300 && t - this.lastTapTime > 0) this.handleDoubleTap(card); this.lastTapTime = t; },
                 toggleImportant(card) { card.isImportant = !card.isImportant; this.saveData(); },
@@ -318,7 +338,8 @@
                 exportData() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.cards)); const node = document.createElement('a'); node.href = dataStr; node.download = "deepstudy_backup.json"; document.body.appendChild(node); node.click(); node.remove(); },
                 importData(e) { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); if(confirm('데이터 덮어쓰기?')) { this.cards = d; this.saveData(); alert('완료'); this.showSettings=false; this.$nextTick(()=>this.initSwiper()); } } catch(err) { alert('파일 오류'); } }; r.readAsText(file); },
                 saveData() { localStorage.setItem('deepstudy_cards', JSON.stringify(this.cards)); },
-                saveSettings() { localStorage.setItem('deepstudy_fontsize', this.fontSize); },
+                // [NEW] 설정 저장 (목소리 인덱스 포함)
+                saveSettings() { localStorage.setItem('deepstudy_fontsize', this.fontSize); localStorage.setItem('deepstudy_voice_idx', this.selectedVoiceIndex); },
                 resetData() { const pw = prompt("모든 카드가 영구 삭제됩니다.\n초기화하려면 비밀번호 '1227'을 입력하세요."); if (pw === '1227') { this.cards = []; this.filterL1=''; this.filterL2=''; this.filterL3=''; this.saveData(); alert('모든 데이터가 초기화되었습니다.'); this.showSettings = false; } else if (pw) { alert('비밀번호가 올바르지 않습니다.'); } },
                 async syncGoogleSheet() { if (!this.googleSheetUrl) return alert('구글 시트 CSV 링크를 입력해주세요.'); this.isSyncing = true; try { const response = await fetch(this.googleSheetUrl); const csvText = await response.text(); const newCards = this.parseCSV(csvText); if (newCards.length === 0) throw new Error('데이터가 없습니다.'); let addedCount = 0; newCards.forEach(nc => { const exists = this.cards.some(c => c.content === nc.content && c.l1 === nc.l1 && c.l2 === nc.l2); if (!exists) { this.cards.push(nc); addedCount++; } }); this.saveData(); localStorage.setItem('deepstudy_sheet_url', this.googleSheetUrl); alert(`동기화 완료!\n총 ${newCards.length}개 중 ${addedCount}개가 새로 추가되었습니다.`); this.showSettings = false; this.$nextTick(() => this.initSwiper()); } catch (e) { alert('실패: 링크가 올바른지 확인해주세요.'); console.error(e); } finally { this.isSyncing = false; } },
                 parseCSV(text) { const rows = []; let currentRow = []; let currentVal = ''; let inQuotes = false; for (let i = 0; i < text.length; i++) { const char = text[i]; const nextChar = text[i+1]; if (inQuotes) { if (char === '"' && nextChar === '"') { currentVal += '"'; i++; } else if (char === '"') { inQuotes = false; } else { currentVal += char; } } else { if (char === '"') { inQuotes = true; } else if (char === ',') { currentRow.push(currentVal.trim()); currentVal = ''; } else if (char === '\n' || char === '\r') { if (currentVal || currentRow.length > 0) currentRow.push(currentVal.trim()); if (currentRow.length > 0) rows.push(currentRow); currentRow = []; currentVal = ''; } else { currentVal += char; } } } if (currentVal || currentRow.length > 0) currentRow.push(currentVal.trim()); if (currentRow.length > 0) rows.push(currentRow); const data = []; const startIndex = (rows[0][0] === 'l1' || rows[0][0] === 'L1') ? 1 : 0; for (let i = startIndex; i < rows.length; i++) { const r = rows[i]; if (r.length < 4) continue; data.push({ id: Date.now() + i, l1: r[0] || '미분류', l2: r[1] || '기본', l3: r[2] || '일반', content: r[3] || '', readCount: 0, isMemorized: false, isImportant: false }); } return data; }
