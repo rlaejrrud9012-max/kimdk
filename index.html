@@ -313,7 +313,7 @@
                                     u.voice = this.voiceList[this.selectedVoiceIndex];
                                 }
                                 u.lang = 'ko-KR'; 
-                                u.rate = 0.9; // 속도 0.9 (자연스러움)
+                                u.rate = 0.8; // 속도 0.8 (자연스러움)
                                 u.pitch = 1.0;
                                 u.onend = () => { resolve(); };
                                 u.onerror = (e) => { console.error(e); resolve(); };
@@ -354,3 +354,4 @@
     </style>
 </body>
 </html>
+
