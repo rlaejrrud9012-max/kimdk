@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DeepStudy V3.1</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #F3F4F6; overscroll-behavior-y: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .card-height { height: 60vh; }
+        .prevent-select { -webkit-user-select: none; user-select: none; }
+        
+        /* 빈칸 뚫기 스타일 */
+        .cloze-hidden {
+            color: transparent;
+            border-bottom: 2px solid #9CA3AF;
+            user-select: none;
+            display: inline-block;
+            min-width: 20px;
+            line-height: 1.2;
+        }
+        .cloze-visible {
+            color: #2563EB;
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col text-gray-800 safe-top safe-bottom bg-gray-50">
+
+    <div id="app" class="flex-1 flex flex-col relative max-w-lg mx-auto w-full h-full">
+        
+        <header class="bg-white px-5 py-4 shadow-sm z-20 flex flex-col space-y-3 shrink-0">
+            <div class="flex justify-between items-center">
+                <h1 class="text-xl font-bold tracking-tight text-gray-900">DeepStudy</h1>
+                <div class="flex space-x-2">
+                    <span class="text-xs text-gray-400 font-medium self-center mr-2">{{ filteredCards.length }}장의 카드</span>
+                    <button @click="showSettings = true" class="p-2 text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <select v-model="filterL1" @change="resetFilters('L1')" class="bg-gray-100 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">대분류 전체</option><option v-for="opt in optionsL1" :value="opt">{{ opt }}</option></select>
+                <select v-model="filterL2" @change="resetFilters('L2')" class="bg-gray-100 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">중분류 전체</option><option v-for="opt in optionsL2" :value="opt">{{ opt }}</option></select>
+                <select v-model="filterL3" class="bg-gray-100 border-none text-xs rounded-lg py-2 px-1 text-center font-medium truncate"><option value="">소분류 전체</option><option v-for="opt in optionsL3" :value="opt">{{ opt }}</option></select>
+            </div>
+        </header>
+
+        <main class="flex-1 relative w-full flex flex-col justify-center overflow-hidden bg-gray-50">
+            <div v-if="filteredCards.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+                <p class="text-sm">데이터가 없습니다.</p>
+                <button @click="openModal('add')" class="mt-4 text-blue-500 font-bold text-sm underline">새 카드 추가</button>
+            </div>
+
+            <div class="swiper mySwiper w-full py-4" v-show="filteredCards.length > 0">
+                <div class="swiper-wrapper">
+                    <div class="swiper-slide px-5" v-for="card in filteredCards" :key="card.id">
+                        <div 
+                            @dblclick="handleDoubleTap(card)"
+                            class="card-height w-full rounded-[2rem] p-7 shadow-xl flex flex-col relative border border-white/50 backdrop-blur-sm transition-colors duration-300 prevent-select" 
+                            :class="card.isMemorized ? 'bg-[#F5F5F5]' : 'bg-[#E3F2FD]'"
+                        >
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-0.5">{{ card.l1 }} > {{ card.l2 }}</span>
+                                    <span class="text-xs font-bold opacity-80 bg-white/40 px-2 py-0.5 rounded-md self-start">{{ card.l3 }}</span>
+                                </div>
+                                <div class="flex items-center bg-white/60 px-2 py-1 rounded-lg shadow-sm">
+                                    <span class="text-[10px] font-bold mr-1">회독</span>
+                                    <select v-model="card.readCount" @change="saveData" class="bg-transparent text-sm font-extrabold focus:outline-none text-blue-900"><option v-for="n in 10" :value="n">{{ n }}</option></select>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 overflow-y-auto no-scrollbar swiper-no-swiping pr-1 my-2">
+                                <div 
+                                    class="text-[17px] font-medium leading-relaxed whitespace-pre-wrap text-left break-keep"
+                                    :class="card.isMemorized ? 'text-gray-500' : 'text-gray-800'"
+                                    v-html="getDisplayContent(card)"
+                                ></div>
+                            </div>
+
+                            <div class="mt-4 pt-4 border-t border-gray-400/10 flex justify-between items-center z-20">
+                                <div class="flex space-x-3">
+                                    <button @click.stop="openModal('edit', card)" class="text-xs text-blue-400 hover:text-blue-600 p-2 font-bold">수정</button>
+                                    <button @click.stop="deleteCard(card.id)" class="text-xs text-red-300 hover:text-red-500 p-2">삭제</button>
+                                </div>
+                                <div class="flex items-center p-2">
+                                    <span class="text-xs font-bold transition-colors duration-300" 
+                                          :class="card.isMemorized ? 'text-gray-400' : 'text-blue-600'">
+                                        {{ card.isMemorized ? '암기완료' : '암기중' }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="absolute bottom-2 left-0 w-full text-center pointer-events-none opacity-20">
+                                <span class="text-[10px]">{{ card.isMemorized ? '두 번 탭하여 암기 취소' : '두 번 탭하여 암기 완료' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div v-if="showModal" class="absolute inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center" @click.self="showModal = false">
+            <div class="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[85vh] flex flex-col animate-slide-up">
+                <div class="flex justify-between mb-6"><h3 class="text-xl font-bold">{{ isEditMode ? '카드 수정' : '카드 추가' }}</h3><button @click="showModal = false" class="text-gray-400">✕</button></div>
+                <div class="flex-1 overflow-y-auto space-y-4 px-1">
+                    <div><label class="text-xs font-bold text-gray-500">대분류</label><input v-model="inputL1" list="dl_l1" class="w-full p-3 bg-gray-50 rounded-xl text-sm"><datalist id="dl_l1"><option v-for="o in allL1" :value="o"></datalist></div>
+                    <div class="flex gap-2">
+                        <div class="flex-1"><label class="text-xs font-bold text-gray-500">중분류</label><input v-model="inputL2" list="dl_l2" class="w-full p-3 bg-gray-50 rounded-xl text-sm"><datalist id="dl_l2"><option v-for="o in filteredL2Options" :value="o"></datalist></div>
+                        <div class="flex-1"><label class="text-xs font-bold text-gray-500">소분류</label><input v-model="inputL3" list="dl_l3" class="w-full p-3 bg-gray-50 rounded-xl text-sm"><datalist id="dl_l3"><option v-for="o in filteredL3Options" :value="o"></datalist></div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 flex justify-between">내용 <span>숨길 단어는 [ ]로 감싸세요</span></label>
+                        <textarea v-model="inputContent" class="w-full h-40 p-4 bg-gray-50 rounded-xl text-base resize-none" placeholder="예: [광명]은 살기 좋다."></textarea>
+                    </div>
+                </div>
+                <button @click="saveCard" class="bg-blue-600 text-white py-4 rounded-xl font-bold text-lg mt-4">{{ isEditMode ? '수정 완료' : '저장하기' }}</button>
+            </div>
+        </div>
+
+        <div v-if="showConfirmModal" class="absolute inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" @click.self="showConfirmModal = false">
+            <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl animate-fade-in text-center">
+                <h3 class="text-lg font-bold mb-2">{{ modalMode === 'memorize' ? '암기 완료?' : '다시 학습?' }}</h3>
+                <p class="text-sm text-gray-500 mb-6">
+                    {{ modalMode === 'memorize' ? '이 카드를 암기 완료 처리합니까?' : '암기 완료를 해제하시겠습니까?' }}
+                </p>
+                <div class="flex space-x-3">
+                    <button @click="showConfirmModal = false" class="flex-1 py-3 bg-gray-100 rounded-xl text-gray-600 font-bold">아니오</button>
+                    <button @click="confirmToggle" class="flex-1 py-3 rounded-xl font-bold text-white" :class="modalMode === 'memorize' ? 'bg-blue-600' : 'bg-gray-600'">네</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showSettings" class="absolute inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center" @click.self="showSettings = false">
+            <div class="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl p-6 h-[75vh] flex flex-col animate-slide-up">
+                <div class="flex justify-between mb-4"><h3 class="text-xl font-bold">설정 및 관리</h3><button @click="showSettings = false" class="text-gray-400">✕</button></div>
+                <div class="mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <h4 class="text-sm font-bold text-blue-800 mb-3">데이터 백업/복원</h4>
+                    <div class="flex space-x-2">
+                        <button @click="exportData" class="flex-1 bg-white border border-blue-200 text-blue-600 text-xs font-bold py-3 rounded-lg shadow-sm hover:bg-blue-50">💾 파일 저장 (PC)</button>
+                        <label class="flex-1 bg-blue-600 text-white text-xs font-bold py-3 rounded-lg shadow-sm text-center cursor-pointer hover:bg-blue-700 flex items-center justify-center">📂 파일 불러오기<input type="file" accept=".json" @change="importData" class="hidden"></label>
+                    </div>
+                </div>
+                <h4 class="text-sm font-bold text-gray-800 mb-2">카테고리 관리</h4>
+                <div class="flex space-x-2 mb-4 border-b border-gray-100 pb-2">
+                    <button @click="manageTab='L1'" :class="manageTab==='L1'?'text-blue-600 font-bold':'text-gray-400'" class="flex-1 py-2">대분류</button>
+                    <button @click="manageTab='L2'" :class="manageTab==='L2'?'text-blue-600 font-bold':'text-gray-400'" class="flex-1 py-2">중분류</button>
+                    <button @click="manageTab='L3'" :class="manageTab==='L3'?'text-blue-600 font-bold':'text-gray-400'" class="flex-1 py-2">소분류</button>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                    <div v-for="item in manageList" :key="item" class="flex justify-between items-center p-3 border-b border-gray-50">
+                        <span class="font-medium text-sm">{{ item }}</span>
+                        <div class="flex space-x-2">
+                            <button @click="renameCategory(item)" class="text-xs bg-gray-100 text-blue-600 px-2 py-1 rounded">수정</button>
+                            <button @click="deleteCategory(item)" class="text-xs bg-red-50 text-red-500 px-2 py-1 rounded">삭제</button>
+                        </div>
+                    </div>
+                    <div v-if="manageList.length===0" class="text-center text-gray-400 text-xs py-4">데이터 없음</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    cards: [], filterL1: '', filterL2: '', filterL3: '',
+                    showModal: false, showSettings: false, showConfirmModal: false,
+                    isEditMode: false, editingId: null, pendingCard: null, modalMode: 'memorize',
+                    inputL1: '', inputL2: '', inputL3: '', inputContent: '',
+                    manageTab: 'L1', swiper: null
+                }
+            },
+            computed: {
+                filteredCards() {
+                    return this.cards.filter(c => 
+                        (this.filterL1==='' || c.l1===this.filterL1) && 
+                        (this.filterL2==='' || c.l2===this.filterL2) && 
+                        (this.filterL3==='' || c.l3===this.filterL3)
+                    );
+                },
+                allL1() { return [...new Set(this.cards.map(c => c.l1))].sort(); },
+                optionsL1() { return this.allL1; },
+                optionsL2() { return [...new Set((this.filterL1 ? this.cards.filter(c => c.l1 === this.filterL1) : this.cards).map(c => c.l2))].filter(Boolean).sort(); },
+                optionsL3() { let t = this.cards; if(this.filterL1) t = t.filter(c => c.l1===this.filterL1); if(this.filterL2) t = t.filter(c => c.l2===this.filterL2); return [...new Set(t.map(c => c.l3))].filter(Boolean).sort(); },
+                filteredL2Options() { return this.inputL1 ? [...new Set(this.cards.filter(c => c.l1===this.inputL1).map(c => c.l2))] : []; },
+                filteredL3Options() { return (this.inputL1 && this.inputL2) ? [...new Set(this.cards.filter(c => c.l1===this.inputL1 && c.l2===this.inputL2).map(c => c.l3))] : []; },
+                manageList() {
+                    if (this.manageTab === 'L1') return this.allL1;
+                    if (this.manageTab === 'L2') return [...new Set(this.cards.map(c => c.l2))].filter(Boolean).sort();
+                    return [...new Set(this.cards.map(c => c.l3))].filter(Boolean).sort();
+                }
+            },
+            watch: { 'filteredCards.length': function() { this.$nextTick(() => this.initSwiper()); } },
+            mounted() {
+                const saved = localStorage.getItem('deepstudy_cards');
+                if (saved) this.cards = JSON.parse(saved);
+                else this.cards = [{ id: 1, l1: '안내', l2: '기초', l3: '사용법', content: '[두 번 탭]하면 암기 상태가 변경됩니다.\n[대괄호]로 감싼 단어는 암기 완료 시 사라집니다.', readCount: 1, isMemorized: false }];
+                this.$nextTick(() => this.initSwiper());
+            },
+            methods: {
+                initSwiper() {
+                    if (this.swiper) { this.swiper.destroy(); this.swiper = null; }
+                    if (this.filteredCards.length > 0) this.swiper = new Swiper(".mySwiper", { effect: "cards", grabCursor: true, centeredSlides: true, slidesPerView: "auto", spaceBetween: 20, observer: true, observeParents: true });
+                },
+                resetFilters(lv) { if(lv==='L1'){this.filterL2='';this.filterL3='';} if(lv==='L2') this.filterL3=''; },
+                openModal(mode, card = null) {
+                    this.isEditMode = (mode === 'edit');
+                    if (this.isEditMode && card) { this.editingId = card.id; this.inputL1 = card.l1; this.inputL2 = card.l2; this.inputL3 = card.l3; this.inputContent = card.content; } 
+                    else { this.editingId = null; this.inputL1=this.filterL1; this.inputL2=this.filterL2; this.inputL3=this.filterL3; this.inputContent=''; }
+                    this.showModal = true;
+                },
+                saveCard() {
+                    if(!this.inputL1 || !this.inputContent) return alert('입력 확인');
+                    if (this.isEditMode && this.editingId) {
+                        const idx = this.cards.findIndex(c => c.id === this.editingId);
+                        if(idx !== -1) { this.cards[idx].l1 = this.inputL1.trim(); this.cards[idx].l2 = this.inputL2.trim()||'기타'; this.cards[idx].l3 = this.inputL3.trim()||'일반'; this.cards[idx].content = this.inputContent; }
+                    } else {
+                        this.cards.push({ id: Date.now(), l1: this.inputL1.trim(), l2: this.inputL2.trim()||'기타', l3: this.inputL3.trim()||'일반', content: this.inputContent, readCount: 1, isMemorized: false });
+                        this.filterL1=this.inputL1; this.filterL2=this.inputL2||'기타';
+                    }
+                    this.saveData(); this.showModal=false;
+                },
+                deleteCard(id) { if(confirm('삭제합니까?')){ this.cards=this.cards.filter(c=>c.id!==id); this.saveData(); } },
+                getDisplayContent(card) {
+                    if (!card.content) return '';
+                    let text = card.content;
+                    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    if (card.isMemorized) {
+                        text = text.replace(/\[(.*?)\]/g, '<span class="cloze-hidden">$1</span>');
+                    } else {
+                        text = text.replace(/\[(.*?)\]/g, '<span class="cloze-visible">$1</span>');
+                    }
+                    return text;
+                },
+                handleDoubleTap(card) {
+                    this.pendingCard = card;
+                    this.modalMode = card.isMemorized ? 'unmemorize' : 'memorize';
+                    this.showConfirmModal = true;
+                },
+                confirmToggle() {
+                    if(this.pendingCard) {
+                        this.pendingCard.isMemorized = !this.pendingCard.isMemorized;
+                        this.saveData();
+                        this.pendingCard = null;
+                    }
+                    this.showConfirmModal = false;
+                },
+                renameCategory(oldName) { const newName = prompt(`'${oldName}' 변경:`, oldName); if (!newName || newName === oldName) return; const lv = this.manageTab.toLowerCase(); this.cards.forEach(c => { if (c[lv] === oldName) c[lv] = newName; }); this.saveData(); if(this.filterL1===oldName) this.filterL1=newName; },
+                deleteCategory(target) { const lv = this.manageTab.toLowerCase(); const cnt = this.cards.filter(c => c[lv] === target).length; if (confirm(`'${target}' 삭제? (${cnt}장)`)) { this.cards = this.cards.filter(c => c[lv] !== target); this.saveData(); this.filterL1=''; } },
+                exportData() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.cards)); const node = document.createElement('a'); node.href = dataStr; node.download = "deepstudy_backup.json"; document.body.appendChild(node); node.click(); node.remove(); },
+                importData(e) { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); if(confirm('데이터 덮어쓰기?')) { this.cards = d; this.saveData(); alert('완료'); this.showSettings=false; this.$nextTick(()=>this.initSwiper()); } } catch(err) { alert('파일 오류'); } }; r.readAsText(file); },
+                saveData() { localStorage.setItem('deepstudy_cards', JSON.stringify(this.cards)); }
+            }
+        }).mount('#app');
+    </script>
+    <style> @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.3s ease-out forwards; } .animate-fade-in { animation: fade-in 0.2s ease-out forwards; } @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } } </style>
+</body>
+</html>
