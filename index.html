@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeepStudy V3.3</title>
+    <title>DeepStudy V3.4</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -17,7 +17,7 @@
         .safe-top { padding-top: env(safe-area-inset-top); }
         .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
         .card-height { height: 60vh; }
-        .prevent-select { -webkit-user-select: none; user-select: none; }
+        .prevent-select { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
         
         /* 빈칸 뚫기 스타일 */
         .cloze-hidden {
@@ -75,7 +75,7 @@
                 <div class="swiper-wrapper">
                     <div class="swiper-slide px-5" v-for="card in filteredCards" :key="card.id">
                         <div 
-                            @dblclick="handleDoubleTap(card)"
+                            @click="handleCardClick(card)"
                             class="card-height w-full rounded-[2rem] p-7 shadow-xl flex flex-col relative border border-white/50 backdrop-blur-sm transition-colors duration-300 prevent-select" 
                             :class="card.isMemorized ? 'bg-[#F5F5F5]' : 'bg-[#E3F2FD]'"
                         >
@@ -86,7 +86,7 @@
                                 </div>
                                 <div class="flex items-center bg-white/60 px-2 py-1 rounded-lg shadow-sm">
                                     <span class="text-[10px] font-bold mr-1">회독</span>
-                                    <select v-model="card.readCount" @change="saveData" class="bg-transparent text-sm font-extrabold focus:outline-none text-blue-900"><option v-for="n in 10" :value="n">{{ n }}</option></select>
+                                    <select v-model="card.readCount" @change="saveData" @click.stop class="bg-transparent text-sm font-extrabold focus:outline-none text-blue-900"><option v-for="n in 10" :value="n">{{ n }}</option></select>
                                 </div>
                             </div>
 
@@ -191,7 +191,8 @@
                     showModal: false, showSettings: false, showConfirmModal: false,
                     isEditMode: false, editingId: null, pendingCard: null, modalMode: 'memorize',
                     inputL1: '', inputL2: '', inputL3: '', inputContent: '',
-                    manageTab: 'L1', swiper: null
+                    manageTab: 'L1', swiper: null,
+                    lastTapTime: 0 // 더블탭 감지용 변수
                 }
             },
             computed: {
@@ -224,7 +225,34 @@
             methods: {
                 initSwiper() {
                     if (this.swiper) { this.swiper.destroy(); this.swiper = null; }
-                    if (this.filteredCards.length > 0) this.swiper = new Swiper(".mySwiper", { effect: "cards", grabCursor: true, centeredSlides: true, slidesPerView: "auto", spaceBetween: 20, observer: true, observeParents: true });
+                    if (this.filteredCards.length > 0) {
+                        // [수정] 스와이프 감도 및 애니메이션 튜닝
+                        this.swiper = new Swiper(".mySwiper", { 
+                            effect: "cards", 
+                            cardsEffect: {
+                                slideShadows: false, // 그림자 제거로 성능 향상
+                                rotate: false, // 회전 제거로 깔끔한 느낌
+                                perSlideOffset: 8 // 카드 간격 조정
+                            },
+                            grabCursor: true, 
+                            centeredSlides: true, 
+                            slidesPerView: "auto", 
+                            speed: 400, // 전환 속도 부드럽게
+                            threshold: 5, // 5px만 움직여도 반응 (민감도 향상)
+                            observer: true, 
+                            observeParents: true 
+                        });
+                    }
+                },
+                // [수정] 모바일 대응 더블탭 감지 로직
+                handleCardClick(card) {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - this.lastTapTime;
+                    if (tapLength < 300 && tapLength > 0) {
+                        // 0.3초 이내 두 번 터치 시 더블탭으로 인정
+                        this.handleDoubleTap(card);
+                    }
+                    this.lastTapTime = currentTime;
                 },
                 resetFilters(lv) { if(lv==='L1'){this.filterL2='';this.filterL3='';} if(lv==='L2') this.filterL3=''; },
                 openModal(mode, card = null) {
@@ -239,8 +267,19 @@
                         const idx = this.cards.findIndex(c => c.id === this.editingId);
                         if(idx !== -1) { this.cards[idx].l1 = this.inputL1.trim(); this.cards[idx].l2 = this.inputL2.trim()||'기타'; this.cards[idx].l3 = this.inputL3.trim()||'일반'; this.cards[idx].content = this.inputContent; }
                     } else {
+                        // 카드 추가 로직
                         this.cards.push({ id: Date.now(), l1: this.inputL1.trim(), l2: this.inputL2.trim()||'기타', l3: this.inputL3.trim()||'일반', content: this.inputContent, readCount: 1, isMemorized: false });
-                        this.filterL1=this.inputL1; this.filterL2=this.inputL2||'기타';
+                        
+                        // [수정] 카드 추가 시 필터 초기화하여 새 카드 즉시 노출
+                        this.filterL1 = ''; this.filterL2 = ''; this.filterL3 = ''; 
+                        
+                        // [수정] 새 카드가 있는 마지막 슬라이드로 자동 이동
+                        this.$nextTick(() => {
+                            if(this.swiper) {
+                                this.swiper.update(); // 스와이퍼 갱신
+                                this.swiper.slideTo(this.cards.length - 1, 500); // 마지막 카드로 부드럽게 이동
+                            }
+                        });
                     }
                     this.saveData(); this.showModal=false;
                 },
